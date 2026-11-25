@@ -15,4 +15,7 @@ public interface ResearchProjectRepository extends JpaRepository<ResearchProject
 
     /** 查询某用户的全部科研项目，按创建时间倒序 */
     List<ResearchProject> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    /** 浏览已批准、可申请加入的科研项目机会。 */
+    List<ResearchProject> findByApplicationStatusOrderByCreatedAtDesc(String applicationStatus);
 }

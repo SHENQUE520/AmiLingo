@@ -26,6 +26,11 @@ public class Patent {
     @Column(nullable = false)
     private String name;
 
+    /** 技术领域及专利摘要 */
+    private String technicalField;
+    @Column(columnDefinition = "TEXT")
+    private String abstractText;
+
     /**
      * 专利类型：INVENTION=发明专利 / UTILITY=实用新型 / DESIGN=外观设计
      */
@@ -51,6 +56,12 @@ public class Patent {
     /** 申请日期 */
     private LocalDate applicationDate;
 
+    /** 受理、公开、实审请求及授权公告关键日期 */
+    private LocalDate acceptanceDate;
+    private LocalDate publicationDate;
+    private LocalDate substantiveExamDate;
+    private LocalDate grantPublicationDate;
+
     /** 授权日期（授权后填写） */
     private LocalDate grantDate;
 
@@ -69,6 +80,7 @@ public class Patent {
 
     @PrePersist
     void onCreate() {
+        if (status == null || status.isBlank()) status = "DISCLOSURE_DRAFT";
         createdAt = updatedAt = LocalDateTime.now();
     }
 

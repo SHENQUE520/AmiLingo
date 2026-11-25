@@ -26,6 +26,13 @@ public class ResearchProject {
     @Column(nullable = false)
     private String projectName;
 
+    /** 项目简介与研究目标 */
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    /** 研究方向/领域 */
+    private String researchField;
+
     /** 本人角色，如：主要参与者、PI助理、项目负责人 */
     private String role;
 
@@ -47,6 +54,27 @@ public class ResearchProject {
     @Column(nullable = false)
     private String status;
 
+    /** 立项审批状态：DRAFT / PENDING / APPROVED / REJECTED */
+    @Column(nullable = false)
+    private String applicationStatus;
+
+    /** 立项审批意见 */
+    @Column(columnDefinition = "TEXT")
+    private String approvalOpinion;
+
+    /** 审批人用户 ID */
+    private Long approvedBy;
+
+    /** 提交审批时间 */
+    private LocalDateTime submittedAt;
+
+    /** 审批完成时间 */
+    private LocalDateTime approvedAt;
+
+    /** 项目总体完成百分比，范围 0-100 */
+    @Column(nullable = false)
+    private Integer progress;
+
     /** 项目成果描述 */
     @Column(columnDefinition = "TEXT")
     private String outcome;
@@ -66,6 +94,9 @@ public class ResearchProject {
 
     @PrePersist
     void onCreate() {
+        if (status == null || status.isBlank()) status = "ONGOING";
+        if (applicationStatus == null || applicationStatus.isBlank()) applicationStatus = "DRAFT";
+        if (progress == null) progress = 0;
         createdAt = updatedAt = LocalDateTime.now();
     }
 
