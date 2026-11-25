@@ -20,6 +20,10 @@ public class ResearchProjectDTO {
     /** 项目名称 */
     private String projectName;
 
+    private String description;
+
+    private String researchField;
+
     /** 本人角色 */
     private String role;
 
@@ -37,6 +41,15 @@ public class ResearchProjectDTO {
 
     /** 状态：ONGOING / COMPLETED / SUSPENDED */
     private String status;
+
+    /** 立项审批状态：DRAFT / PENDING / APPROVED / REJECTED */
+    private String applicationStatus;
+
+    private String approvalOpinion;
+
+    private Long approvedBy;
+
+    private Integer progress;
 
     /** 成果描述 */
     private String outcome;

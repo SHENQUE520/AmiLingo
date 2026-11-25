@@ -38,6 +38,12 @@ public class ResearchProjectController {
                 .orElse(Result.notFound("科研项目不存在，id=" + id));
     }
 
+    /** 浏览已审批通过的项目机会，用于申请加入/发起组队。 */
+    @GetMapping("/opportunities")
+    public Result<List<ResearchProjectDTO>> opportunities() {
+        return Result.ok(service.listOpportunities());
+    }
+
     /** 新增科研项目 */
     @PostMapping
     public Result<ResearchProjectDTO> create(@RequestBody ResearchProjectDTO dto) {

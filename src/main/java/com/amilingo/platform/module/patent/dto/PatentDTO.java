@@ -19,6 +19,10 @@ public class PatentDTO {
     /** 专利名称 */
     private String name;
 
+    private String technicalField;
+
+    private String abstractText;
+
     /** 类型：INVENTION / UTILITY / DESIGN */
     private String type;
 
@@ -36,6 +40,14 @@ public class PatentDTO {
 
     /** 申请日期 */
     private LocalDate applicationDate;
+
+    private LocalDate acceptanceDate;
+
+    private LocalDate publicationDate;
+
+    private LocalDate substantiveExamDate;
+
+    private LocalDate grantPublicationDate;
 
     /** 授权日期 */
     private LocalDate grantDate;

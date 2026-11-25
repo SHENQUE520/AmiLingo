@@ -45,12 +45,18 @@ public class PatentService {
     public Optional<PatentDTO> update(Long id, PatentDTO dto) {
         return repo.findById(id).map(existing -> {
             existing.setName(dto.getName());
+            existing.setTechnicalField(dto.getTechnicalField());
+            existing.setAbstractText(dto.getAbstractText());
             existing.setType(dto.getType());
             existing.setApplicationNumber(dto.getApplicationNumber());
             existing.setGrantNumber(dto.getGrantNumber());
             existing.setInventorOrder(dto.getInventorOrder());
             existing.setStatus(dto.getStatus());
             existing.setApplicationDate(dto.getApplicationDate());
+            existing.setAcceptanceDate(dto.getAcceptanceDate());
+            existing.setPublicationDate(dto.getPublicationDate());
+            existing.setSubstantiveExamDate(dto.getSubstantiveExamDate());
+            existing.setGrantPublicationDate(dto.getGrantPublicationDate());
             existing.setGrantDate(dto.getGrantDate());
             existing.setAttachments(joinAttachments(dto.getAttachments()));
             return toDTO(repo.save(existing));
@@ -72,12 +78,18 @@ public class PatentService {
                 .id(e.getId())
                 .userId(e.getUserId())
                 .name(e.getName())
+                .technicalField(e.getTechnicalField())
+                .abstractText(e.getAbstractText())
                 .type(e.getType())
                 .applicationNumber(e.getApplicationNumber())
                 .grantNumber(e.getGrantNumber())
                 .inventorOrder(e.getInventorOrder())
                 .status(e.getStatus())
                 .applicationDate(e.getApplicationDate())
+                .acceptanceDate(e.getAcceptanceDate())
+                .publicationDate(e.getPublicationDate())
+                .substantiveExamDate(e.getSubstantiveExamDate())
+                .grantPublicationDate(e.getGrantPublicationDate())
                 .grantDate(e.getGrantDate())
                 .attachments(splitAttachments(e.getAttachments()))
                 .build();
@@ -87,12 +99,18 @@ public class PatentService {
         return Patent.builder()
                 .userId(dto.getUserId())
                 .name(dto.getName())
+                .technicalField(dto.getTechnicalField())
+                .abstractText(dto.getAbstractText())
                 .type(dto.getType())
                 .applicationNumber(dto.getApplicationNumber())
                 .grantNumber(dto.getGrantNumber())
                 .inventorOrder(dto.getInventorOrder())
                 .status(dto.getStatus())
                 .applicationDate(dto.getApplicationDate())
+                .acceptanceDate(dto.getAcceptanceDate())
+                .publicationDate(dto.getPublicationDate())
+                .substantiveExamDate(dto.getSubstantiveExamDate())
+                .grantPublicationDate(dto.getGrantPublicationDate())
                 .grantDate(dto.getGrantDate())
                 .attachments(joinAttachments(dto.getAttachments()))
                 .build();
