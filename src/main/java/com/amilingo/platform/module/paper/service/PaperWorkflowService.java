@@ -84,7 +84,8 @@ public class PaperWorkflowService {
         int next = versionRepo.findFirstByPaperIdOrderByVersionNoDesc(paperId)
                 .map(v -> v.getVersionNo() + 1).orElse(1);
         if ("DRAFT".equals(p.getTopicStatus())) p.setTopicStatus("CONFIRMED");
-        p.setStatus("WRITING"); paperRepo.save(p);
+        if (p.getStatus() == null) p.setStatus("WRITING");
+        paperRepo.save(p);
         return versionRepo.save(PaperDraftVersion.builder().paperId(paperId).versionNo(next)
                 .versionType(r.versionType()).content(r.content()).wordCount(wordCount(r.content()))
                 .changeNote(r.changeNote()).createdBy(r.actorUserId()).currentVersion(true).build());
@@ -105,8 +106,13 @@ public class PaperWorkflowService {
 
     @Transactional
     public PaperSubmission createSubmission(Long paperId, SubmissionRequest r) {
-        Paper p = ownedPaper(paperId, r.actorUserId());
+        Paper p = lockedPaper(paperId, r.actorUserId());
         validateVersion(paperId, r.draftVersionId());
+        if ("ACCEPTED".equals(p.getStatus()) || "PUBLISHED".equals(p.getStatus()))
+            throw new IllegalStateException("已录用或发表的论文不能再次投稿");
+        if (submissionRepo.findByPaperIdOrderByRoundNoDesc(paperId).stream()
+                .anyMatch(s -> !"REJECTED".equals(s.getStatus()) && !"WITHDRAWN".equals(s.getStatus())))
+            throw new IllegalStateException("请先结束当前投稿再转投");
         int round = submissionRepo.findFirstByPaperIdOrderByRoundNoDesc(paperId)
                 .map(s -> s.getRoundNo() + 1).orElse(1);
         PaperSubmission result = submissionRepo.save(PaperSubmission.builder().paperId(paperId).roundNo(round)
@@ -116,14 +122,20 @@ public class PaperWorkflowService {
                 .submissionDate(r.submissionDate()).status("SUBMITTED").notes(r.notes())
                 .attachments(join(r.attachments())).build());
         p.setJournal(r.venueName()); p.setSubmissionDate(r.submissionDate());
+        p.setAcceptanceDate(null); p.setPublicationDate(null);
         changePaperStatus(p, "SUBMITTED", r.actorUserId(), "第 " + round + " 次投稿");
         return result;
     }
 
     @Transactional
     public PaperSubmission changeSubmissionStatus(Long submissionId, SubmissionStatusRequest r) {
+        Long paperId = submissionRepo.findPaperIdById(submissionId)
+                .orElseThrow(() -> new IllegalArgumentException("投稿记录不存在"));
+        Paper p = lockedPaper(paperId, r.actorUserId());
         PaperSubmission s = submission(submissionId);
-        Paper p = ownedPaper(s.getPaperId(), r.actorUserId());
+        requireLatestSubmission(s);
+        validateTransition(s.getStatus(), r.status());
+        if ("PUBLISHED".equals(p.getStatus())) throw new IllegalStateException("已发表论文不能回退投稿状态");
         s.setStatus(r.status());
         if (r.notes() != null) s.setNotes(r.notes());
         String paperStatus = switch (r.status()) {
@@ -167,8 +179,35 @@ public class PaperWorkflowService {
 
     @Transactional
     public PaperReviewRecord createReviewRecord(Long paperId, ReviewRecordRequest r) {
-        Paper p = ownedPaper(paperId, r.actorUserId());
+        Paper p = lockedPaper(paperId, r.actorUserId());
+        if ("PUBLISHED".equals(p.getStatus())) throw new IllegalStateException("已发表的审稿流程已经结束");
+        if (r.submissionId() == null) throw new IllegalArgumentException("审稿必须关联投稿记录");
         validateSubmission(paperId, r.submissionId()); validateVersion(paperId, r.responseDraftVersionId());
+        PaperSubmission s = submission(r.submissionId());
+        requireLatestSubmission(s);
+        if (r.statusDate().isBefore(s.getSubmissionDate())) throw new IllegalArgumentException("审稿日期不能早于投稿日期");
+        var previous = reviewRepo.findByPaperIdOrderByStatusDateDescIdDesc(paperId).stream()
+                .filter(x -> r.submissionId().equals(x.getSubmissionId())).findFirst();
+        previous.ifPresent(last -> {
+            if (r.statusDate().isBefore(last.getStatusDate()) || r.reviewRound() < last.getReviewRound())
+                throw new IllegalArgumentException("审稿日期和轮次不能倒退");
+            if ("PUBLISHED".equals(last.getStatus())) throw new IllegalStateException("已发表的审稿流程已经结束");
+        });
+        if ("REVISION_SUBMITTED".equals(r.status()) && r.responseDraftVersionId() == null)
+            throw new IllegalArgumentException("提交返修必须关联回复稿版本");
+        if ("REVISION_SUBMITTED".equals(r.status()) && !"REVISION".equals(s.getStatus()))
+            throw new IllegalStateException("只有待返修的投稿可以提交返修");
+        String submissionStatus = switch (r.status()) {
+            case "EDITOR_CHECK" -> "SUBMITTED";
+            case "UNDER_REVIEW", "REVISION_SUBMITTED" -> "UNDER_REVIEW";
+            case "MINOR_REVISION", "MAJOR_REVISION" -> "REVISION";
+            case "ACCEPTED", "PROOF", "ONLINE", "PUBLISHED" -> "ACCEPTED";
+            case "REJECTED" -> "REJECTED";
+            default -> throw new IllegalArgumentException("无效审稿状态");
+        };
+        if (java.util.Set.of("PROOF", "ONLINE", "PUBLISHED").contains(r.status()) && !"ACCEPTED".equals(s.getStatus()))
+            throw new IllegalStateException("录用后才能校样或发表");
+        validateTransition(s.getStatus(), submissionStatus);
         if (r.revisionDeadline() != null && r.revisionDeadline().isBefore(r.statusDate()))
             throw new IllegalArgumentException("返修截止日期不能早于状态日期");
         PaperReviewRecord record = reviewRepo.save(PaperReviewRecord.builder().paperId(paperId)
@@ -177,13 +216,14 @@ public class PaperWorkflowService {
                 .responseDraftVersionId(r.responseDraftVersionId()).attachments(join(r.attachments()))
                 .operatorUserId(r.actorUserId()).build());
         String paperStatus = switch (r.status()) {
-            case "ACCEPTED" -> "ACCEPTED";
+            case "ACCEPTED", "PROOF", "ONLINE" -> "ACCEPTED";
             case "PUBLISHED" -> "PUBLISHED";
             case "REJECTED" -> "WRITING";
             default -> "SUBMITTED";
         };
         if ("ACCEPTED".equals(r.status())) p.setAcceptanceDate(r.statusDate());
         if ("PUBLISHED".equals(r.status())) p.setPublicationDate(r.statusDate());
+        s.setStatus(submissionStatus); submissionRepo.save(s);
         changePaperStatus(p, paperStatus, r.actorUserId(), "审稿状态变更为 " + r.status());
         return record;
     }
@@ -204,6 +244,26 @@ public class PaperWorkflowService {
     }
     private Paper ownedPaper(Long id, Long userId) {
         return access.requireEdit(id, userId);
+    }
+    private Paper lockedPaper(Long id, Long userId) {
+        Paper paper = paperRepo.lockById(id).orElseThrow(() -> new IllegalArgumentException("论文不存在"));
+        access.requireEdit(id, userId);
+        return paper;
+    }
+    private void requireLatestSubmission(PaperSubmission s) {
+        if (!submissionRepo.findFirstByPaperIdOrderByRoundNoDesc(s.getPaperId())
+                .map(latest -> s.getId().equals(latest.getId())).orElse(false))
+            throw new IllegalStateException("历史投稿不能改变当前论文状态");
+    }
+    private void validateTransition(String from, String to) {
+        if (java.util.Objects.equals(from, to)) return;
+        java.util.Set<String> allowed = switch (from) {
+            case "SUBMITTED" -> java.util.Set.of("UNDER_REVIEW", "REVISION", "ACCEPTED", "REJECTED", "WITHDRAWN");
+            case "UNDER_REVIEW" -> java.util.Set.of("REVISION", "ACCEPTED", "REJECTED", "WITHDRAWN");
+            case "REVISION" -> java.util.Set.of("UNDER_REVIEW", "ACCEPTED", "REJECTED", "WITHDRAWN");
+            default -> java.util.Set.of();
+        };
+        if (!allowed.contains(to)) throw new IllegalStateException("不允许从 " + from + " 转为 " + to);
     }
     private PaperOutlineSection outline(Long id) { return outlineRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("大纲章节不存在")); }
     private PaperDraftVersion version(Long id) { return versionRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("论文版本不存在")); }

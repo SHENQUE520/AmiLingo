@@ -14,6 +14,10 @@ import java.util.List;
 @Repository
 public interface PaperRepository extends JpaRepository<Paper, Long>, JpaSpecificationExecutor<Paper> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select p from Paper p where p.id = :id")
+    java.util.Optional<Paper> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
     /** 查询某用户的全部论文，按创建时间倒序 */
     List<Paper> findByUserIdOrderByCreatedAtDesc(Long userId);
 }
