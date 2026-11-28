@@ -48,7 +48,7 @@ public final class PaperWorkflowDTO {
             @NotBlank @Pattern(regexp="PENDING|IN_PROGRESS|RESOLVED|REJECTED") String status,
             @Size(max=10000) String studentReply, Long resolvedVersionId) {}
 
-    public record ReviewRecordRequest(@NotNull Long actorUserId, Long submissionId,
+    public record ReviewRecordRequest(@NotNull Long actorUserId, @NotNull Long submissionId,
             @NotNull @Min(1) Integer reviewRound,
             @NotBlank @Pattern(regexp="EDITOR_CHECK|UNDER_REVIEW|MINOR_REVISION|MAJOR_REVISION|REVISION_SUBMITTED|ACCEPTED|REJECTED|PROOF|ONLINE|PUBLISHED") String status,
             @NotNull LocalDate statusDate, @Size(max=20000) String reviewComment,
